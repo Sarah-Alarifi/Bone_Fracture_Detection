@@ -7,7 +7,7 @@ import tensorflow as tf  # إذا كنت تستخدم TensorFlow
 # تحميل النموذج
 @st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model('model/your_model_file.h5')  # مسار النموذج
+    model = tf.keras.models.load_model('ann.joblib')  # مسار النموذج
     return model
 
 # تحليل الصورة
