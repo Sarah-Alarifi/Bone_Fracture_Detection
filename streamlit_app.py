@@ -3,11 +3,13 @@ import numpy as np
 import cv2
 from PIL import Image
 import tensorflow as tf  # إذا كنت تستخدم TensorFlow
+import joblib
+
 
 # تحميل النموذج
 @st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model('ann.joblib')  # مسار النموذج
+    model = joblib.load('model/ann.joblib')  # Adjust the path
     return model
 
 # تحليل الصورة
@@ -19,12 +21,12 @@ def predict_image(model, image):
     return prediction.tolist()
 
 # واجهة Streamlit
-st.title("تحليل الصور باستخدام نموذج AI")
+st.title("Bone Fracture Detection")
 
-st.write("ارفع صورة لتحليلها باستخدام النموذج الخاص بك.")
+st.write("upload the photo")
 
 # رفع صورة
-uploaded_file = st.file_uploader("اختر صورة", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("choose", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     # عرض الصورة المرفوعة
@@ -39,5 +41,5 @@ if uploaded_file is not None:
     result = predict_image(model, image_array)
 
     # عرض النتائج
-    st.write("### النتيجة")
+    st.write("### result")
     st.write(result)
