@@ -9,7 +9,7 @@ import joblib
 # تحميل النموذج
 @st.cache_resource
 def load_model():
-    model = joblib.load('ann.joblib')  # Adjust the path
+    model = tf.keras.models.load_model('yolo_kidney.h5')  # مسار النموذج
     return model
 
 # تحليل الصورة
