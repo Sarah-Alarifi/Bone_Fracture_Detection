@@ -5,19 +5,18 @@ import streamlit as st
 import numpy as np
 import cv2  # For SIFT feature extraction
 
-# Function to load the KNN classifier model
-def load_knn_model(model_name: str = "knn_classifier.pkl"):
+# Function to load a model
+def load_model(model_name: str):
     """
-    Load the pre-trained KNN model.
+    Load a pre-trained model.
 
     Args:
         model_name (str): Name of the model file to load.
 
     Returns:
-        sklearn.base.BaseEstimator: The loaded KNN model.
+        sklearn.base.BaseEstimator: The loaded model.
     """
-    knn_model = joblib.load(model_name)
-    return knn_model
+    return joblib.load(model_name)
 
 # Function to extract SIFT features
 def extract_features(img) -> np.ndarray:
@@ -30,43 +29,41 @@ def extract_features(img) -> np.ndarray:
     Returns:
         np.ndarray: Feature vector of fixed size (128).
     """
-    # Convert PIL image to OpenCV format
     image_cv = np.array(img)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)  # Convert to grayscale
 
-    # Use SIFT to extract features
     sift = cv2.SIFT_create()
     keypoints, descriptors = sift.detectAndCompute(image_cv, None)
 
-    # Flatten descriptors to a fixed size
     if descriptors is not None:
-        return descriptors.flatten()[:128]  # Ensure consistent size (truncate/pad)
+        return descriptors.flatten()[:128]  # Truncate/pad to fixed size
     else:
-        return np.zeros(128)  # Return a zero vector if no features are found
+        return np.zeros(128)  # Zero vector if no features are found
 
 # Function to preprocess and classify an image
-def classify_image_knn(img: bytes, model) -> pd.DataFrame:
+def classify_image(img: bytes, model, model_type: str) -> pd.DataFrame:
     """
-    Classify the given image using the KNN model and return predictions.
+    Classify the given image using the selected model and return predictions.
 
     Args:
         img (bytes): The image file to classify.
-        model: The pre-trained KNN model.
+        model: The pre-trained model.
+        model_type (str): The type of model (KNN, ANN, or SVM).
 
     Returns:
         pd.DataFrame: A DataFrame containing predictions and their probabilities.
     """
     try:
-        # Preprocess the image and extract features
         image = Image.open(img).convert("RGB")
         features = extract_features(image)
 
-        # Debugging: Print feature shape
-        st.write(f"Extracted feature vector shape: {features.shape}")
-
-        # Predict using the KNN model
-        prediction = model.predict([features])
-        probabilities = model.predict_proba([features])[0]  # Get class probabilities
+        # Predict based on the model type
+        if model_type == "KNN" or model_type == "SVM":
+            prediction = model.predict([features])
+            probabilities = model.predict_proba([features])[0]  # Class probabilities
+        elif model_type == "ANN":
+            probabilities = model.predict_proba([features])[0]  # For ANN
+            prediction = [np.argmax(probabilities)]  # Get class with highest probability
 
         # Map numeric predictions to descriptive labels
         LABEL_MAPPING = {
@@ -93,9 +90,18 @@ st.write("Upload an X-ray or bone scan image to analyze the structure.")
 # Upload image
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
-# Load the pre-trained KNN model
+# Model selection
+model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM"])
+
+# Load the selected model
 try:
-    knn_model = load_knn_model("knn_classifier.pkl")
+    model_files = {
+        "KNN": "knn_classifier.pkl",
+        "ANN": "ann_classifier.pkl",
+        "SVM": "svm_classifier.pkl"
+    }
+    selected_model_file = model_files[model_type]
+    model = load_model(selected_model_file)
 except FileNotFoundError as e:
     st.error(f"Missing file: {e}")
     st.stop()
@@ -106,7 +112,7 @@ if image_file:
     
     if pred_button:
         # Perform image classification
-        predictions_df, top_prediction = classify_image_knn(image_file, knn_model)
+        predictions_df, top_prediction = classify_image(image_file, model, model_type)
 
         if not predictions_df.empty:
             # Display top prediction
