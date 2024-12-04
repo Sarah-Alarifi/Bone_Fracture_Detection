@@ -1,50 +1,51 @@
-import tensorflow as tf
+import joblib
 import pandas as pd
 from PIL import Image
 import streamlit as st
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
-# Function to load the bone structure model
-def load_model(model_name: str = "yolo_kidney.h5") -> tf.keras.Model:
+# Function to load the KNN classifier model
+def load_knn_model(model_name: str = "knn_classifier.pkl"):
     """
-    Load the pre-trained bone structure model.
-    
+    Load the pre-trained KNN model.
+
     Args:
         model_name (str): Name of the model file to load.
-    
-    Returns:
-        tf.keras.Model: The loaded TensorFlow model.
-    """
-    tf_model = tf.keras.models.load_model("yolo_kidney.h5")
-    return tf_model
 
-# Function to classify a bone structure image
-def classify_image(img: bytes, model: tf.keras.Model) -> pd.DataFrame:
+    Returns:
+        sklearn.base.BaseEstimator: The loaded KNN model.
     """
-    Classify the given image using the provided model and return predictions.
-    
+    knn_model = joblib.load(model_name)
+    return knn_model
+
+# Function to preprocess and classify an image
+def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
+    """
+    Classify the given image using the KNN model and return predictions.
+
     Args:
         img (bytes): The image file to classify.
-        model (tf.keras.Model): The pre-trained model to use for prediction.
-    
+        model: The pre-trained KNN model.
+        scaler: The scaler used to preprocess features.
+
     Returns:
         pd.DataFrame: A DataFrame containing predictions and their probabilities.
     """
     # Preprocess the image
     image = Image.open(img).convert("RGB")
-    image = image.resize((224, 224))  # Resize to match model input size
-    image_array = np.array(image) / 255.0  # Normalize pixel values
-    image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
+    image = image.resize((224, 224))  # Resize to match expected input
+    image_array = np.array(image).flatten()  # Flatten the image for KNN
+    image_array = scaler.transform([image_array])  # Scale the image features
 
-    # Make predictions using the model
-    pred_probs = model.predict(image_array)[0]  # Get predictions
-    class_indices = np.argsort(pred_probs)[::-1][:3]  # Top 3 predictions
-    class_labels = ["Tas_Var"]  # Replace with actual class names
-    probabilities = pred_probs[class_indices]
+    # Predict using the KNN model
+    prediction = model.predict(image_array)
+    probabilities = model.predict_proba(image_array)[0]  # Get class probabilities
 
     # Create a DataFrame to store predictions and probabilities
+    class_labels = model.classes_  # Get class labels from the model
     prediction_df = pd.DataFrame({
-        "Class": [class_labels[i] for i in class_indices],
+        "Class": class_labels,
         "Probability": probabilities
     })
     return prediction_df.sort_values("Probability", ascending=False)
@@ -56,16 +57,17 @@ st.write("Upload an X-ray or bone scan image to analyze the structure.")
 # Upload image
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
+# Load the pre-trained KNN model and scaler
+knn_model = load_knn_model("knn_classifier.pkl")
+scaler = joblib.load("scaler.pkl")  # Ensure the scaler used for training is saved and loaded
+
 if image_file:
     st.image(image_file, caption="Uploaded Image", use_column_width=True)
     pred_button = st.button("Analyze Bone Structure")
     
     if pred_button:
-        # Load the model
-        model = load_model()
-        
         # Perform image classification
-        predictions_df = classify_image(image_file, model)
+        predictions_df = classify_image_knn(image_file, knn_model, scaler)
         
         # Display top prediction
         top_prediction_row = predictions_df.iloc[0]
@@ -75,5 +77,3 @@ if image_file:
         # Display all predictions
         st.write("Detailed Predictions:")
         st.table(predictions_df)
-
-# Note: Replace "Class A", "Class B", "Class C" with actual bone structure class names.
