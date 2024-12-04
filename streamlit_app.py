@@ -4,7 +4,6 @@ from PIL import Image
 import streamlit as st
 import numpy as np
 import cv2  # For SIFT feature extraction
-from sklearn.preprocessing import StandardScaler
 
 # Function to load the KNN classifier model
 def load_knn_model(model_name: str = "knn_classifier.pkl"):
@@ -45,21 +44,14 @@ def extract_features(img) -> np.ndarray:
     else:
         return np.zeros(128)  # Return a zero vector if no features are found
 
-# Mapping numeric labels to descriptive names
-LABEL_MAPPING = {
-    0: "Not Fractured",
-    1: "Fractured"
-}
-
 # Function to preprocess and classify an image
-def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
+def classify_image_knn(img: bytes, model) -> pd.DataFrame:
     """
     Classify the given image using the KNN model and return predictions.
 
     Args:
         img (bytes): The image file to classify.
         model: The pre-trained KNN model.
-        scaler: The scaler used to preprocess features.
 
     Returns:
         pd.DataFrame: A DataFrame containing predictions and their probabilities.
@@ -71,16 +63,16 @@ def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
 
         # Debugging: Print feature shape
         st.write(f"Extracted feature vector shape: {features.shape}")
-        st.write(f"Scaler expected shape: {scaler.mean_.shape}")
-
-        # Scale the features
-        features_scaled = scaler.transform([features])  # Ensure correct input shape
 
         # Predict using the KNN model
-        prediction = model.predict(features_scaled)[0]
-        probabilities = model.predict_proba(features_scaled)[0]  # Get class probabilities
+        prediction = model.predict([features])
+        probabilities = model.predict_proba([features])[0]  # Get class probabilities
 
         # Map numeric predictions to descriptive labels
+        LABEL_MAPPING = {
+            0: "Not Fractured",
+            1: "Fractured"
+        }
         class_labels = [LABEL_MAPPING[cls] for cls in model.classes_]
 
         # Create a DataFrame to store predictions and probabilities
@@ -88,7 +80,7 @@ def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
             "Class": class_labels,
             "Probability": probabilities
         })
-        return prediction_df.sort_values("Probability", ascending=False), LABEL_MAPPING[prediction]
+        return prediction_df.sort_values("Probability", ascending=False), LABEL_MAPPING[prediction[0]]
 
     except Exception as e:
         st.error(f"An error occurred during classification: {e}")
@@ -101,10 +93,9 @@ st.write("Upload an X-ray or bone scan image to analyze the structure.")
 # Upload image
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
-# Load the pre-trained KNN model and scaler
+# Load the pre-trained KNN model
 try:
     knn_model = load_knn_model("knn_classifier.pkl")
-    scaler = joblib.load("scaler.pkl")  # Ensure the scaler used for training is saved and loaded
 except FileNotFoundError as e:
     st.error(f"Missing file: {e}")
     st.stop()
@@ -115,7 +106,7 @@ if image_file:
     
     if pred_button:
         # Perform image classification
-        predictions_df, top_prediction = classify_image_knn(image_file, knn_model, scaler)
+        predictions_df, top_prediction = classify_image_knn(image_file, knn_model)
 
         if not predictions_df.empty:
             # Display top prediction
