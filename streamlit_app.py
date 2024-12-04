@@ -3,6 +3,7 @@ import pandas as pd
 from PIL import Image
 import streamlit as st
 import numpy as np
+import cv2  # For SIFT feature extraction
 from sklearn.preprocessing import StandardScaler
 
 # Function to load the KNN classifier model
@@ -19,6 +20,31 @@ def load_knn_model(model_name: str = "knn_classifier.pkl"):
     knn_model = joblib.load(model_name)
     return knn_model
 
+# Function to extract SIFT features
+def extract_features(img) -> np.ndarray:
+    """
+    Extract features from the image using SIFT.
+
+    Args:
+        img (PIL.Image): The input image.
+
+    Returns:
+        np.ndarray: Feature vector of fixed size (128).
+    """
+    # Convert PIL image to OpenCV format
+    image_cv = np.array(img)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)  # Convert to grayscale
+
+    # Use SIFT to extract features
+    sift = cv2.SIFT_create()
+    keypoints, descriptors = sift.detectAndCompute(image_cv, None)
+
+    # Flatten descriptors to a fixed size
+    if descriptors is not None:
+        return descriptors.flatten()[:128]  # Ensure consistent size (truncate/pad)
+    else:
+        return np.zeros(128)  # Return a zero vector if no features are found
+
 # Function to preprocess and classify an image
 def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
     """
@@ -33,21 +59,20 @@ def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing predictions and their probabilities.
     """
     try:
-        # Preprocess the image
+        # Preprocess the image and extract features
         image = Image.open(img).convert("RGB")
-        image = image.resize((224, 224))  # Resize to match expected input
-        image_array = np.array(image).flatten()  # Flatten the image for KNN
+        features = extract_features(image)
 
-        # Debugging: Print the shape of the processed image
-        st.write(f"Processed image shape: {image_array.shape}")
+        # Debugging: Print feature shape
+        st.write(f"Extracted feature vector shape: {features.shape}")
         st.write(f"Scaler expected shape: {scaler.mean_.shape}")
 
-        # Scale the image features
-        image_array = scaler.transform([image_array])  # Ensure correct input shape
+        # Scale the features
+        features_scaled = scaler.transform([features])  # Ensure correct input shape
 
         # Predict using the KNN model
-        prediction = model.predict(image_array)
-        probabilities = model.predict_proba(image_array)[0]  # Get class probabilities
+        prediction = model.predict(features_scaled)
+        probabilities = model.predict_proba(features_scaled)[0]  # Get class probabilities
 
         # Create a DataFrame to store predictions and probabilities
         class_labels = model.classes_  # Get class labels from the model
