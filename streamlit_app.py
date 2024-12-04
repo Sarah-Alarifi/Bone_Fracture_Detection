@@ -45,6 +45,12 @@ def extract_features(img) -> np.ndarray:
     else:
         return np.zeros(128)  # Return a zero vector if no features are found
 
+# Mapping numeric labels to descriptive names
+LABEL_MAPPING = {
+    0: "Not Fractured",
+    1: "Fractured"
+}
+
 # Function to preprocess and classify an image
 def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
     """
@@ -71,20 +77,22 @@ def classify_image_knn(img: bytes, model, scaler) -> pd.DataFrame:
         features_scaled = scaler.transform([features])  # Ensure correct input shape
 
         # Predict using the KNN model
-        prediction = model.predict(features_scaled)
+        prediction = model.predict(features_scaled)[0]
         probabilities = model.predict_proba(features_scaled)[0]  # Get class probabilities
 
+        # Map numeric predictions to descriptive labels
+        class_labels = [LABEL_MAPPING[cls] for cls in model.classes_]
+
         # Create a DataFrame to store predictions and probabilities
-        class_labels = model.classes_  # Get class labels from the model
         prediction_df = pd.DataFrame({
             "Class": class_labels,
             "Probability": probabilities
         })
-        return prediction_df.sort_values("Probability", ascending=False)
+        return prediction_df.sort_values("Probability", ascending=False), LABEL_MAPPING[prediction]
 
     except Exception as e:
         st.error(f"An error occurred during classification: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(), None
 
 # Streamlit app
 st.title("Bone Structure Analysis")
@@ -107,13 +115,12 @@ if image_file:
     
     if pred_button:
         # Perform image classification
-        predictions_df = classify_image_knn(image_file, knn_model, scaler)
+        predictions_df, top_prediction = classify_image_knn(image_file, knn_model, scaler)
 
         if not predictions_df.empty:
             # Display top prediction
-            top_prediction_row = predictions_df.iloc[0]
-            st.success(f'Predicted Structure: **{top_prediction_row["Class"]}** '
-                       f'Confidence: {top_prediction_row["Probability"]:.2%}')
+            st.success(f'Predicted Structure: **{top_prediction}** '
+                       f'Confidence: {predictions_df.iloc[0]["Probability"]:.2%}')
 
             # Display all predictions
             st.write("Detailed Predictions:")
