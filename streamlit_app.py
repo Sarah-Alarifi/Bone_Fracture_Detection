@@ -15,7 +15,7 @@ def load_model(model_name: str = "yolo_kidney.h5") -> tf.keras.Model:
     Returns:
         tf.keras.Model: The loaded TensorFlow model.
     """
-    tf_model = tf.keras.models.load_model(f"models_and_data/{model_name}")
+    tf_model = tf.keras.models.load_model("yolo_kidney.h5")
     return tf_model
 
 # Function to classify a bone structure image
