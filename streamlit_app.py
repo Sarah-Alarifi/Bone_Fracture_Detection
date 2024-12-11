@@ -4,43 +4,40 @@ from PIL import Image
 import streamlit as st
 import numpy as np
 import cv2  # For SIFT feature extraction
+from tensorflow.keras.models import load_model as load_keras_model  # For loading CNN
+from tensorflow.keras.applications.resnet50 import preprocess_input
 
 # Function to load a model
-def load_model(model_name: str):
+def load_model(model_name: str, model_type: str):
     """
     Load a pre-trained model.
 
     Args:
         model_name (str): Name of the model file to load.
+        model_type (str): The type of model (KNN, ANN, SVM, or CNN).
 
     Returns:
-        sklearn.base.BaseEstimator: The loaded model.
+        Model: The loaded model.
     """
+    
     return joblib.load(model_name)
 
-# Function to extract SIFT features
-def extract_features(img) -> np.ndarray:
+# Function to preprocess the image for CNN
+def preprocess_image_for_cnn(img) -> np.ndarray:
     """
-    Extract features from the image using SIFT.
+    Preprocess the image for CNN input.
 
     Args:
         img (PIL.Image): The input image.
 
     Returns:
-        np.ndarray: Feature vector of fixed size (128).
+        np.ndarray: Preprocessed image suitable for CNN.
     """
-    image_cv = np.array(img)
-    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)  # Convert to grayscale
+    image_cv = np.array(img.resize((224, 224)))  # Resize to match CNN input
+    image_preprocessed = preprocess_input(image_cv)  # Apply ResNet50 preprocessing
+    return np.expand_dims(image_preprocessed, axis=0)  # Add batch dimension
 
-    sift = cv2.SIFT_create()
-    keypoints, descriptors = sift.detectAndCompute(image_cv, None)
-
-    if descriptors is not None:
-        return descriptors.flatten()[:128]  # Truncate/pad to fixed size
-    else:
-        return np.zeros(128)  # Zero vector if no features are found
-
-# Function to preprocess and classify an image
+# Function to classify an image
 def classify_image(img: bytes, model, model_type: str) -> pd.DataFrame:
     """
     Classify the given image using the selected model and return predictions.
@@ -48,29 +45,34 @@ def classify_image(img: bytes, model, model_type: str) -> pd.DataFrame:
     Args:
         img (bytes): The image file to classify.
         model: The pre-trained model.
-        model_type (str): The type of model (KNN, ANN, or SVM).
+        model_type (str): The type of model (KNN, ANN, SVM, or CNN).
 
     Returns:
         pd.DataFrame: A DataFrame containing predictions and their probabilities.
     """
     try:
         image = Image.open(img).convert("RGB")
-        features = extract_features(image)
 
-        # Predict based on the model type
-        if model_type == "KNN" or model_type == "SVM":
-            prediction = model.predict([features])
-            probabilities = model.predict_proba([features])[0]  # Class probabilities
-        elif model_type == "ANN":
-            probabilities = model.predict_proba([features])[0]  # For ANN
+        # Extract features or preprocess image based on model type
+        if model_type == "CNN":
+            features = preprocess_image_for_cnn(image)
+            probabilities = model.predict(features)[0]
             prediction = [np.argmax(probabilities)]  # Get class with highest probability
+        else:
+            features = extract_features(image)
+            if model_type in ["KNN", "SVM"]:
+                prediction = model.predict([features])
+                probabilities = model.predict_proba([features])[0]
+            elif model_type == "ANN":
+                probabilities = model.predict_proba([features])[0]
+                prediction = [np.argmax(probabilities)]
 
         # Map numeric predictions to descriptive labels
         LABEL_MAPPING = {
             0: "Not Fractured",
             1: "Fractured"
         }
-        class_labels = [LABEL_MAPPING[cls] for cls in model.classes_]
+        class_labels = [LABEL_MAPPING[cls] for cls in range(len(probabilities))]
 
         # Create a DataFrame to store predictions and probabilities
         prediction_df = pd.DataFrame({
@@ -91,17 +93,18 @@ st.write("Upload an X-ray or bone scan image to analyze the structure.")
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
 # Model selection
-model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM"])
+model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM", "CNN"])
 
 # Load the selected model
 try:
     model_files = {
         "KNN": "knn_classifier.pkl",
         "ANN": "ann_classifier.pkl",
-        "SVM": "svm_classifier.pkl"
+        "SVM": "svm_classifier.pkl",
+        "CNN": "small_cnn_with_dropout.pkl"  # CNN model file in H5 format
     }
     selected_model_file = model_files[model_type]
-    model = load_model(selected_model_file)
+    model = load_model(selected_model_file, model_type)
 except FileNotFoundError as e:
     st.error(f"Missing file: {e}")
     st.stop()
