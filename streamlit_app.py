@@ -91,7 +91,7 @@ st.write("Upload an X-ray or bone scan image to analyze the structure.")
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
 # Model selection
-model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM"])
+model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM", "detection"])
 
 # Load the selected model
 try:
