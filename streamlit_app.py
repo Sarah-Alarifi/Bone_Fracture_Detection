@@ -4,6 +4,7 @@ from PIL import Image
 import streamlit as st
 import numpy as np
 import cv2  # For SIFT feature extraction
+import torch
 
 # Function to load a model
 def load_model(model_name: str):
