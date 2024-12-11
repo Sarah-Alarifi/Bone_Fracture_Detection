@@ -84,43 +84,75 @@ def classify_image(img: bytes, model, model_type: str) -> pd.DataFrame:
         return pd.DataFrame(), None
 
 # Streamlit app
-st.title("Bone Structure Analysis")
-st.write("Upload an X-ray or bone scan image to analyze the structure.")
+st.title("Bone Structure Analysis and Object Detection")
+st.write("Upload an X-ray or bone scan image for analysis.")
 
 # Upload image
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
 # Model selection
-model_type = st.selectbox("Choose a model:", ["KNN", "ANN", "SVM", "detection"])
+model_type = st.selectbox("Choose a classification model:", ["KNN", "ANN", "SVM", "YOLO Object Detection"])
 
-# Load the selected model
-try:
-    model_files = {
-        "KNN": "knn_classifier.pkl",
-        "ANN": "ann_classifier.pkl",
-        "SVM": "svm_classifier.pkl",
-    }
-    selected_model_file = model_files[model_type]
-    model = load_model(selected_model_file)
-except FileNotFoundError as e:
-    st.error(f"Missing file: {e}")
-    st.stop()
+# Load classification models
+if model_type in ["KNN", "ANN", "SVM"]:
+    try:
+        model_files = {
+            "KNN": "knn_classifier.pkl",
+            "ANN": "ann_classifier.pkl",
+            "SVM": "svm_classifier.pkl",
+        }
+        selected_model_file = model_files[model_type]
+        model = load_model(selected_model_file)
+    except FileNotFoundError as e:
+        st.error(f"Missing file: {e}")
+        st.stop()
+
+# YOLO object detection
+if model_type == "YOLO Object Detection":
+    try:
+        # Load YOLO model
+        yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path='kidney_yolo.pt')  # Replace 'best.pt' with your YOLO model path
+        st.success("YOLO model loaded successfully!")
+    except Exception as e:
+        st.error(f"Error loading YOLO model: {e}")
+        st.stop()
 
 if image_file:
     st.image(image_file, caption="Uploaded Image", use_column_width=True)
-    pred_button = st.button("Analyze Bone Structure")
-    
+    pred_button = st.button("Analyze Image")
+
     if pred_button:
-        # Perform image classification
-        predictions_df, top_prediction = classify_image(image_file, model, model_type)
+        if model_type in ["KNN", "ANN", "SVM"]:
+            # Perform classification
+            predictions_df, top_prediction = classify_image(image_file, model, model_type)
 
-        if not predictions_df.empty:
-            # Display top prediction
-            st.success(f'Predicted Structure: **{top_prediction}** '
-                       f'Confidence: {predictions_df.iloc[0]["Probability"]:.2%}')
+            if not predictions_df.empty:
+                # Display top prediction
+                st.success(f'Predicted Structure: **{top_prediction}** '
+                           f'Confidence: {predictions_df.iloc[0]["Probability"]:.2%}')
+                # Display all predictions
+                st.write("Detailed Predictions:")
+                st.table(predictions_df)
+            else:
+                st.error("Failed to classify the image.")
 
-            # Display all predictions
-            st.write("Detailed Predictions:")
-            st.table(predictions_df)
-        else:
-            st.error("Failed to classify the image.")
+        elif model_type == "YOLO Object Detection":
+            # Load and preprocess image
+            image = Image.open(image_file).convert("RGB")
+            image_np = np.array(image)
+
+            # Perform object detection
+            results = yolo_model(image_np)
+
+            # Filter results for the single class
+            detection_data = results.pandas().xyxy[0]
+            if detection_data.empty:
+                st.warning("No objects detected in the image.")
+            else:
+                # Display results with bounding boxes
+                st.image(results.render()[0], caption="YOLO Detection Results", use_column_width=True)
+
+                # Display detection confidence
+                st.write("Detection Results:")
+                detection_data = detection_data[["xmin", "ymin", "xmax", "ymax", "confidence"]]
+                st.table(detection_data)
