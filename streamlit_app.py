@@ -98,7 +98,7 @@ try:
     model_files = {
         "KNN": "knn_classifier.pkl",
         "ANN": "ann_classifier.pkl",
-        "SVM": "svm_classifier.pkl"
+        "SVM": "svm_classifier.pkl",
         "detection": "kidney_yolo.pkl"
 
     }
