@@ -92,7 +92,7 @@ st.write("Upload an X-ray or bone scan image for analysis.")
 image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
 
 # Model selection
-model_type = st.selectbox("Choose a classification model:", ["KNN", "ANN", "SVM", "YOLO Object Detection"])
+model_type = st.selectbox("Choose a classification model:", ["KNN", "ANN", "SVM", "YOLO Object Detection","cnn_with_dropout"])
 
 # Load classification models
 if model_type in ["KNN", "ANN", "SVM"]:
@@ -101,6 +101,7 @@ if model_type in ["KNN", "ANN", "SVM"]:
             "KNN": "knn_classifier.pkl",
             "ANN": "ann_classifier.pkl",
             "SVM": "svm_classifier.pkl",
+            "cnn_with_dropout": "small_cnn_with_dropout.pkl"
         }
         selected_model_file = model_files[model_type]
         model = load_model(selected_model_file)
