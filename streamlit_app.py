@@ -95,7 +95,7 @@ image_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"
 model_type = st.selectbox("Choose a classification model:", ["KNN", "ANN", "SVM", "YOLO Object Detection","cnn_with_dropout"])
 
 # Load classification models
-if model_type in ["KNN", "ANN", "SVM"]:
+if model_type in ["KNN", "ANN", "SVM", "cnn_with_dropout"]:
     try:
         model_files = {
             "KNN": "knn_classifier.pkl",
