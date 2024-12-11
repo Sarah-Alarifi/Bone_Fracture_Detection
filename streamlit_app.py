@@ -99,6 +99,7 @@ try:
         "KNN": "knn_classifier.pkl",
         "ANN": "ann_classifier.pkl",
         "SVM": "svm_classifier.pkl"
+        "detection": "kidney_yolo.pkl"
     }
     selected_model_file = model_files[model_type]
     model = load_model(selected_model_file)
